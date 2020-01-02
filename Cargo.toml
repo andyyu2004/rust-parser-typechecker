@@ -1,5 +1,5 @@
 [package]
-name = "pratt-parser"
+name = "parser-typechecker"
 version = "0.1.0"
 authors = ["= <andyyu2004@gmail.com>"]
 edition = "2018"
@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 rustyline = "5.0.4"
-lexer = { path = "../lexer" }
+regexlexer = { path = "../regexlexer" }
+regex = "1"

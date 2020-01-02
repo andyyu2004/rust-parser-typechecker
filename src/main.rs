@@ -1,66 +1,22 @@
+#![feature(box_syntax)]
+
+mod parsing;
+mod lexing;
+mod error;
+mod util;
+mod macros;
+mod typechecking;
+
 use rustyline::{Editor};
 use rustyline::error::{ReadlineError};
-use lexer::lexing::{Lexer, LexSyntax};
 use std::env;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum TokenType {
-    Plus, Minus, Star, Slash,
-    Number,
-    Eof,
-    Let,
-    Bind,
-    Less, LessEqual, Greater, GreaterEqual,
-    Equal, Bang,
-    DoubleEqual, BangEqual,
-    Inc, Dec,
-}
-
-macro_rules! map(
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = ::std::collections::HashMap::new();
-            $(
-                m.insert($key, $value);
-            )+
-                m
-        }
-    };
-);
-
-fn generate_syntax() -> LexSyntax<'static, TokenType> {
-    let symbols = map! {
-        "+"   => TokenType::Plus,
-        // "--"  => TokenType::Dec,
-        "++"  => TokenType::Inc,
-        "-"   => TokenType::Minus,
-        "*"   => TokenType::Star,
-        "/"   => TokenType::Slash,
-        ">>=" => TokenType::Bind,
-        "<"   => TokenType::Less,
-        "<="  => TokenType::LessEqual,
-        ">="  => TokenType::GreaterEqual,
-        ">"   => TokenType::Greater,
-        "="   => TokenType::Equal,
-        "=="  => TokenType::DoubleEqual,
-        "!="  => TokenType::BangEqual,
-        "!"   => TokenType::Bang
-    };
-
-    let token_classes = map! {
-        "<integer>" => TokenType::Number,
-        "<float>" => TokenType::Number,
-        "<eof>" => TokenType::Eof
-    };
-
-    let keywords = map! { "let" => TokenType::Let };
-
-    LexSyntax::new(symbols, keywords, token_classes)
-}
+use lexing::gen_syntax;
+use regexlexer::Lexer;
+use parsing::Parser;
 
 fn main() {
     let mut rl = Editor::<()>::new();
-    let lexical_syntax = generate_syntax();
+    let lexical_syntax = gen_syntax();
 
     if env::args().len() > 2 {
         println!("[usage] <file>");
@@ -68,8 +24,8 @@ fn main() {
     }
 
     if env::args().len() == 2 {
-        let contents = std::fs::read_to_string(&env::args().collect::<Vec<String>>()[1]).expect("Failed to read string");
-        let mut lexer = Lexer::new(&contents, &lexical_syntax);
+        let contents = std::fs::read_to_string(&env::args().collect::<Vec<String>>()[1]).expect("Failed to read file");
+        let lexer = Lexer::new(&contents, &lexical_syntax);
         println!("{:?}", lexer.lex());
         std::process::exit(1);
     }
@@ -99,13 +55,31 @@ fn main() {
             }
         };
 
-        let mut lexer = Lexer::new(&line, &lexical_syntax);
+        let lexer = Lexer::new(&line, &lexical_syntax);
+        let tokens = match lexer.lex() {
+            Ok(tokens) => tokens,
+            Err(err)   => {
+                eprintln!("{}", err.join("\n"));
+                continue;
+            }
+        };
 
-        match lexer.lex() {
-            Ok(tokens) => println!("{:?}", tokens),
-            Err(err) => println!("{:?}", err),
-        }
+        println!("tokens: {:?}", tokens);
+
+        let mut parser = Parser::new(&tokens);
+        let res = parser.parse().map(|expr| {
+            println!("{:?}", expr);
+            println!("{}", expr);
+            expr
+        });
+
+        if let Err(err) = res { eprintln!("{:?}", err) }
+
 
         rl.save_history("history.txt").unwrap();
+
+
     }
 }
+
+
