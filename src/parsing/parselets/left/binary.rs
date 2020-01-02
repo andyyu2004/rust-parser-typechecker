@@ -3,13 +3,14 @@ use regexlexer::{Token, TokenKind};
 use crate::error::Error;
 
 /// Returns the precedence accounting for associativity
+/// If an operator is right-associative, recursively parse expression with precedence of one less so it will parse itself
 fn precedence(token: Token) -> Precedence {
     Precedence::of_left(token) - if right_associative(token) { 1 } else { 0 }
 }
 
 fn right_associative(token: Token) -> bool {
     match token.kind {
-        TokenKind::Caret => true,
+        TokenKind::DStar => true,
         _                => false,
     }
 }
