@@ -1,12 +1,20 @@
 [package]
-name = "parser-typechecker"
+name = "parsertypechecker"
 version = "0.1.0"
 authors = ["= <andyyu2004@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "parserlib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "parserbin"
+path = "src/bin.rs"
+
 
 [dependencies]
 rustyline = "5.0.4"
 regexlexer = { path = "../regexlexer" }
+variable-gen = { path = "../variable-gen" }
 regex = "1"

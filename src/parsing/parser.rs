@@ -3,30 +3,36 @@ use regexlexer::{Token, TokenKind};
 use crate::error::Error;
 use super::parselets::*;
 use crate::util::Assert;
+use variable_gen::Generator;
+use crate::typechecking::Ty;
 
 pub struct Parser<'a> {
-    tokens: &'a Vec<Token<'a>>,
+    tokens: Vec<Token<'a>>,
     i: usize,
     node_id: u64,
+    var_gen: Generator,
 }
 
 type NullParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Token<'b>)           -> Result<Expr<'b>, Error>;
 type LeftParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Expr<'b>, Token<'b>) -> Result<Expr<'b>, Error>;
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a Vec<Token<'a>>) -> Self {
-        Parser { tokens, i: 0, node_id: 0 }
+    pub fn new(tokens: Vec<Token<'a>>) -> Self {
+        Parser { tokens, i: 0, node_id: 0, var_gen: Generator::new() }
     }
 
-    pub fn gen_id(&mut self) -> u64 {
+    pub(crate) fn gen_id(&mut self) -> u64 {
         self.node_id += 1;
         self.node_id
     }
 
-    pub fn parse(&mut self) -> Result<Expr<'a>, Error> {
+    pub(crate) fn gen_type_var(&mut self) -> Ty { Ty::UVar(self.var_gen.gen()) }
+
+    pub fn parse(&mut self) -> Result<Expr<'a>, Vec<Error>> {
         self.parse_expression(Precedence::ZERO)
             .assert(|_| self.peek().map(|x| x.kind) == Ok(TokenKind::EOF),
                     || Error::new(self.curr_or_last(), format!("Did not consume all tokens (debug::currently on {:?})", self.peek())))
+            .map_err(|err| vec![err])
     }
 
     fn curr_precedence(&self) -> Precedence {
@@ -54,7 +60,12 @@ impl<'a> Parser<'a> {
     fn get_null_denotation_rule(token_kind: TokenKind) -> Option<NullParseFn> {
         match token_kind {
             TokenKind::Integral   => Some(parse_integral),
+            TokenKind::LParen     => Some(parse_group),
             TokenKind::Identifier => Some(parse_id),
+            TokenKind::Str        => Some(parse_str),
+            TokenKind::Let        => Some(parse_let),
+            TokenKind::LBrace     => Some(parse_block),
+            TokenKind::False | TokenKind::True => Some(parse_bool),
             TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde | TokenKind::Bang => Some(parse_prefix_op),
             _ => None
         }
@@ -62,7 +73,17 @@ impl<'a> Parser<'a> {
 
     fn get_left_denotation_rule(token_kind: TokenKind) -> LeftParseFn {
         match token_kind {
-            TokenKind::Plus | TokenKind::Minus | TokenKind::Slash | TokenKind::Star => parse_binary,
+            TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::Slash
+                | TokenKind::Star
+                | TokenKind::LT
+                | TokenKind::LTE
+                | TokenKind::GT
+                | TokenKind::GTE
+                | TokenKind::DEqual
+                | TokenKind::BangEqual
+                | TokenKind::DStar => parse_binary,
             _ => unimplemented!()
         }
     }
@@ -79,6 +100,25 @@ impl<'a> Parser<'a> {
         } else {
             Err(Error::new(*self.tokens.last().unwrap(), "Ran out of tokens".to_owned()))
         }
+    }
+
+    /// Asserts the next token is the one given;
+    pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<Token<'a>, Error> {
+        let curr = self.peek()?;
+        if curr.kind == kind {
+            self.i += 1;
+            Ok(curr)
+        } else {
+            Err(Error::new(curr, format!("Expected `{}` found `{}`", kind, curr.kind)))
+        }
+    }
+
+    /// Returns a boolean indicating whether the next token matches the one provided;
+    /// If so, consumes the token;
+    pub(crate) fn matches(&mut self, kind: TokenKind) -> bool {
+        let is_match = self.peek().map(|t| t.kind) == Ok(kind);
+        if is_match { self.i += 1 };
+        is_match
     }
 
     /// Convenience method for grabbing a token for error handling purposes

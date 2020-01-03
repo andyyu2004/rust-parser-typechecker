@@ -1,22 +1,11 @@
 #![feature(box_syntax)]
-
-mod parsing;
-mod lexing;
-mod error;
-mod util;
-mod macros;
-mod typechecking;
-
 use rustyline::{Editor};
 use rustyline::error::{ReadlineError};
 use std::env;
-use lexing::gen_syntax;
-use regexlexer::Lexer;
-use parsing::Parser;
+use parserlib::generate_ast;
 
 fn main() {
     let mut rl = Editor::<()>::new();
-    let lexical_syntax = gen_syntax();
 
     if env::args().len() > 2 {
         println!("[usage] <file>");
@@ -25,8 +14,6 @@ fn main() {
 
     if env::args().len() == 2 {
         let contents = std::fs::read_to_string(&env::args().collect::<Vec<String>>()[1]).expect("Failed to read file");
-        let lexer = Lexer::new(&contents, &lexical_syntax);
-        println!("{:?}", lexer.lex());
         std::process::exit(1);
     }
 
@@ -55,26 +42,16 @@ fn main() {
             }
         };
 
-        let lexer = Lexer::new(&line, &lexical_syntax);
-        let tokens = match lexer.lex() {
-            Ok(tokens) => tokens,
-            Err(err)   => {
-                eprintln!("{}", err.join("\n"));
+        match generate_ast(&line) {
+            Ok(ast) => {
+                println!("{:?}", ast);
+                println!("{}", ast)
+            }
+            Err(err) => {
+                eprintln!("{:?}", err);
                 continue;
             }
-        };
-
-        println!("tokens: {:?}", tokens);
-
-        let mut parser = Parser::new(&tokens);
-        let res = parser.parse().map(|expr| {
-            println!("{:?}", expr);
-            println!("{}", expr);
-            expr
-        });
-
-        if let Err(err) = res { eprintln!("{:?}", err) }
-
+        }
 
         rl.save_history("history.txt").unwrap();
 

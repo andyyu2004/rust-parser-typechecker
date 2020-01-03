@@ -1,5 +1,5 @@
 use std::ops::{Sub};
-use regexlexer::{Token, TokenKind};
+use regexlexer::Token;
 
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub enum Precedence {
@@ -15,10 +15,11 @@ pub enum Precedence {
     SHIFT   = 9,
     TERM    = 10,
     FACTOR  = 11,
-    CAST    = 12,
-    UNARY   = 13,
-    CALL    = 14,
-    PRIMARY = 15,
+    EXPO    = 12,
+    CAST    = 13,
+    UNARY   = 14,
+    CALL    = 15,
+    PRIMARY = 16,
 }
 
 use regexlexer::TokenKind::*;
@@ -26,9 +27,13 @@ impl Precedence {
     /// Precedence of left denotation parselets
     pub fn of_left(token: Token) -> Self {
         match token.kind {
-            Plus | Minus | Star | Slash => Precedence::TERM,
-            EOF                         => Precedence::ZERO,
-            _ => unimplemented!()
+            Plus | Minus        => Precedence::TERM,
+            Star | Slash        => Precedence::FACTOR,
+            DStar               => Precedence::EXPO,
+            DEqual | BangEqual  => Precedence::EQ,
+            GT | GTE | LT | LTE => Precedence::CMP,
+            EOF                 => Precedence::ZERO,
+            _                   => Precedence::ZERO,
         }
     }
 }
@@ -49,10 +54,11 @@ impl From<i32> for Precedence {
             9  => Self::SHIFT,
             10 => Self::TERM,
             11 => Self::FACTOR,
-            12 => Self::CAST,
-            13 => Self::UNARY,
-            14 => Self::CALL,
-            15 => Self::PRIMARY,
+            12 => Self::EXPO,
+            13 => Self::CAST,
+            14 => Self::UNARY,
+            15 => Self::CALL,
+            16 => Self::PRIMARY,
             _ => panic!("Invalid integer for precedence"),
         }
     }

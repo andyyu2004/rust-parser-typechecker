@@ -9,8 +9,10 @@ fn precedence(token: Token) -> Precedence {
 }
 
 fn right_associative(token: Token) -> bool {
+    // Assignment and exponentiation are right associative
     match token.kind {
         TokenKind::DStar => true,
+        TokenKind::Equal => true,
         _                => false,
     }
 }
@@ -18,5 +20,5 @@ fn right_associative(token: Token) -> bool {
 pub(crate) fn parse_binary<'a>(parser: &mut Parser<'a>, left: Expr<'a>, token: Token<'a>) -> Result<Expr<'a>, Error> {
     let right = box parser.parse_expression(precedence(token))?;
     let exprkind = ExprKind::Binary { op: token.kind, left: box left, right };
-    Ok(Expr::new(token, exprkind, parser.gen_id()))
+    Ok(Expr::new(token, exprkind, parser.gen_type_var(), parser.gen_id()))
 }
