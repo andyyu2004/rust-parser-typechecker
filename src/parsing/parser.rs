@@ -3,14 +3,13 @@ use regexlexer::{Token, TokenKind};
 use crate::error::Error;
 use super::parselets::*;
 use crate::util::Assert;
-use variable_gen::Generator;
 use crate::typechecking::Ty;
 
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
     i: usize,
     node_id: u64,
-    var_gen: Generator,
+    backtrack_index: usize,
 }
 
 type NullParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Token<'b>)           -> Result<Expr<'b>, Error>;
@@ -18,7 +17,7 @@ type LeftParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Expr<'b>, Token<'b>) -> Re
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token<'a>>) -> Self {
-        Parser { tokens, i: 0, node_id: 0, var_gen: Generator::new() }
+        Parser { tokens, i: 0, node_id: 0, backtrack_index: 0 }
     }
 
     pub(crate) fn gen_id(&mut self) -> u64 {
@@ -26,7 +25,7 @@ impl<'a> Parser<'a> {
         self.node_id
     }
 
-    pub(crate) fn gen_type_var(&mut self) -> Ty { Ty::UVar(self.var_gen.gen()) }
+    pub(crate) fn gen_type_var(&mut self) -> Ty { Ty::Infer(self.gen_id()) }
 
     pub fn parse(&mut self) -> Result<Expr<'a>, Vec<Error>> {
         self.parse_expression(Precedence::ZERO)
@@ -65,6 +64,7 @@ impl<'a> Parser<'a> {
             TokenKind::Str        => Some(parse_str),
             TokenKind::Let        => Some(parse_let),
             TokenKind::LBrace     => Some(parse_block),
+            TokenKind::Fn         => Some(parse_lambda),
             TokenKind::False | TokenKind::True => Some(parse_bool),
             TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde | TokenKind::Bang => Some(parse_prefix_op),
             _ => None
@@ -73,6 +73,7 @@ impl<'a> Parser<'a> {
 
     fn get_left_denotation_rule(token_kind: TokenKind) -> LeftParseFn {
         match token_kind {
+            TokenKind::LParen => parse_application,
             TokenKind::Plus
                 | TokenKind::Minus
                 | TokenKind::Slash
@@ -92,6 +93,9 @@ impl<'a> Parser<'a> {
     fn next(&mut self) -> Result<Token<'a>, Error> {
         self.peek().map(|tok| { self.i += 1; tok })
     }
+
+    pub(crate) fn set_backtrack(&mut self) { self.backtrack_index = self.i }
+    pub(crate) fn backtrack(&mut self) { self.i = self.backtrack_index }
 
     /// Returns ref to current token or an error if the current token is at EOF or even further
     fn peek(&self) -> Result<Token<'a>, Error> {

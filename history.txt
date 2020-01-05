@@ -1,62 +1,3 @@
-/* 233
-/* 233 *
-/* 233 *?
-/* 233 */
-/* 233 /* */
-/*
- 
-/*
-/* 
-1
-2
-123
-//
-// 123
-/*
-/* 
-/* */
-/* 2344 */
-/* 2344 /* *.*/
-/* 2344 /* */ */
-/* 2344 /* */ */ */
->>-
->>
->-
->>=
->>-
->
->>=
-++
-+ +
-++
-+ +
-let
-var
-let
-wer
-sdf
-234234
-let
-var
-er
-wer
-rt
-wer
-dg
->>-
->> -
-> > -
-+-
-+--
-var x = x + 5
-var x = x + 5;
-var x = x + 5
-var x = x + 5; var x = x + 5;
- var x = x + 5;
-var x = x + 5
-var x = x + 5var x = x + 5
-var x = x + 5
-hello
 x+4>>=3
 34
 344.
@@ -98,3 +39,62 @@ let x = 5 in x
 {
 { 234
 { 234 }
+fn () => 5
+fn (x) => 5
+fn () => 5
+let x: Int = 5 in 5
+let x: Int -> Bool = 5 in 5
+let x: Int -> Bool -> Bool= 5 in 5
+let x: Int -> Bool -> Bool -> Int= 5 in 5
+let x: Int -> Bool -> Bool -> Int = 5 in 5
+let x: (Int -> Bool) -> Bool -> Int = 5 in 5
+let x: Int -> Bool -> Bool -> Int = 5 in 5
+fn x: Int => 5
+fn x: Bool => 5
+fn x: Bool => fn y: Bool  => 5
+fn x: Bool => fn y: Bool => 5
+fn x: Bool => fn y: Bool => false
+fn x: Bool => fn y: Bool -> Int => false
+fn x: Int => 5
+fn x: (Int, Int( => 5
+fn x: (Int, Int) => 5
+fn x: (Int) => 5
+fn x: (Int, Int) => 5
+fn x: (Int) => 5
+fn x: Int -> Int => 5
+fn x: (Int, Int) => 5
+fn x: (Int -> Int) => 5
+fn x: fn (Int -> Int) => 5
+fn x: fn (Int -> Int) -> Int => 5
+fn x: fn Int -> Int => 5
+fn x: fn (Int) -> Int => 5
+fn x: fn (Int, Int) -> Int => 5
+fn x: fn (Int, Int -> Bool) -> Int => 5
+fn x: fn (Int, fn (Int) -> Bool) -> Int => 5
+fn x: fn (Int, fn (Int) -> Bool,) -> Int => 5
+fn x: fn (Int, fn (Int) -> Bool, ) -> Int => 5
+fn x: fn (Int, fn (Int) -> Bool) -> Int => 5
+fn x: fn (Int, fn (Int) -> Bool) => 5
+fn x: (Int, fn (Int) -> Bool) => 5
+fn x => x
+fn x => fn y => x
+fn x => fn y => y
+let f = fn x => x in f
+\f => f(f)
+fn f => f(f)
+fn f => f
+let f = fn x => x
+let f = fn x => x in f
+let f = fn x => x in f(4)
+let f = fn x => x in f
+let f = fn x => x in f(5)
+let f = fn x => x in f
+1
+2
+3
+fn x => x
+let f = fn x => x in f
+let f = fn x => x in f(4)
+let f = fn x => x in f
+let x = 5 in x
+let x: Bool = 5 in x

@@ -1,4 +1,5 @@
 use crate::parsing::{Parser, Expr, ExprKind};
+use crate::typechecking::Ty;
 use regexlexer::Token;
 use crate::error::Error;
 
@@ -8,7 +9,7 @@ pub(crate) fn parse_bool<'a>(parser: &mut Parser<'a>, token: Token<'a>) -> Resul
     Ok(Expr::new(
         token,
         kind,
-        parser.gen_type_var(),
+        Ty::Bool,
         parser.gen_id()
     ))
 }

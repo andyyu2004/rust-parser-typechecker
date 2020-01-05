@@ -1,7 +1,7 @@
 mod parser;
 mod expr;
 mod precedence;
-mod parselets;
+pub mod parselets;
 
 pub use parser::Parser;
 pub use expr::{Expr, ExprKind, Binder};

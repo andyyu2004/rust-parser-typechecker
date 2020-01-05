@@ -1,5 +1,6 @@
 use std::ops::{Sub};
 use regexlexer::Token;
+use regexlexer::TokenKind::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub enum Precedence {
@@ -22,18 +23,19 @@ pub enum Precedence {
     PRIMARY = 16,
 }
 
-use regexlexer::TokenKind::*;
+
 impl Precedence {
     /// Precedence of left denotation parselets
     pub fn of_left(token: Token) -> Self {
         match token.kind {
-            Plus | Minus        => Precedence::TERM,
-            Star | Slash        => Precedence::FACTOR,
-            DStar               => Precedence::EXPO,
-            DEqual | BangEqual  => Precedence::EQ,
-            GT | GTE | LT | LTE => Precedence::CMP,
-            EOF                 => Precedence::ZERO,
-            _                   => Precedence::ZERO,
+            Plus | Minus        => Self::TERM,
+            Star | Slash        => Self::FACTOR,
+            DStar               => Self::EXPO,
+            DEqual | BangEqual  => Self::EQ,
+            GT | GTE | LT | LTE => Self::CMP,
+            EOF                 => Self::ZERO,
+            LParen              => Self::CALL,
+            _                   => Self::ZERO,
         }
     }
 }
@@ -65,7 +67,7 @@ impl From<i32> for Precedence {
 }
 
 impl<T> Sub<T> for Precedence where T : Into<i32> {
-    type Output = Precedence;
+    type Output = Self;
 
     fn sub(self, r: T) -> Self::Output {
         (self as i32 - r.into()).into()
@@ -78,8 +80,7 @@ mod test {
 
     #[test]
     fn test_sub() {
-        let primary = Precedence::PRIMARY;
-        assert_eq!(primary - 15, Precedence::ZERO);
+        assert_eq!(Precedence::ASSIGN - 1, Precedence::ZERO);
     }
 
     #[test]

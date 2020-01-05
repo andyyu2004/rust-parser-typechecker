@@ -26,6 +26,7 @@ fn main() {
         let line = match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
+                if line.is_empty() { continue }
                 line
             },
             Err(ReadlineError::Interrupted) => {
@@ -43,9 +44,10 @@ fn main() {
         };
 
         match generate_ast(&line) {
-            Ok(ast) => {
+            Ok((ty, ast)) => {
                 println!("{:?}", ast);
-                println!("{}", ast)
+                println!("{}", ast);
+                println!("{}", ty)
             }
             Err(err) => {
                 eprintln!("{:?}", err);

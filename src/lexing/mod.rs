@@ -2,6 +2,7 @@ mod token_kind;
 use regex::Regex;
 use regexlexer::{LexSyntax, TokenKind, Token};
 use crate::util::Dummy;
+use crate::map;
 
 impl<'a> Dummy for Token<'a> {
     fn dummy() -> Self {
@@ -17,18 +18,16 @@ impl<'a> Dummy for Token<'a> {
 pub fn gen_syntax() -> LexSyntax {
     LexSyntax {
         symbols: vec! [
-            /* keywords */
-            (Regex::new(r#"^let"#).unwrap(),   TokenKind::Let),
-            (Regex::new(r#"^false"#).unwrap(), TokenKind::False),
-            (Regex::new(r#"^true"#).unwrap(),  TokenKind::True),
-            (Regex::new(r#"^in"#).unwrap(),    TokenKind::In),
-
             /* token classes */
-            (Regex::new(r#"^(0|[1-9][0-9]*)"#).unwrap(), TokenKind::Integral),
-            (Regex::new(r#"^[a-z]"#).unwrap(),           TokenKind::Identifier),
-            (Regex::new(r#"^".*?""#).unwrap(),           TokenKind::Str), // Non-greedy match *?
+            (Regex::new(r#"^(0|[1-9][0-9]*)"#).unwrap(),     TokenKind::Integral),
+            (Regex::new(r#"^([a-z][a-zA-Z0-9]*)"#).unwrap(), TokenKind::Identifier),
+            (Regex::new(r#"^([A-Z][A-Za-z]*)"#).unwrap(),    TokenKind::Typename),
+            (Regex::new(r#"^".*?""#).unwrap(),               TokenKind::Str), // Non-greedy match *?
 
             /* symbols */
+            (Regex::new(r#"^->"#).unwrap(),    TokenKind::RArrow),
+            (Regex::new(r#"^,"#).unwrap(),     TokenKind::Comma),
+            (Regex::new(r#"^=>"#).unwrap(),    TokenKind::RFArrow),
             (Regex::new(r#"^ "#).unwrap(),     TokenKind::Space),
             (Regex::new(r#"^;"#).unwrap(),     TokenKind::SemiColon),
             (Regex::new(r#"^:"#).unwrap(),     TokenKind::Colon),
@@ -53,6 +52,17 @@ pub fn gen_syntax() -> LexSyntax {
             (Regex::new(r#">="#).unwrap(),     TokenKind::GTE),
             (Regex::new(r#">"#).unwrap(),      TokenKind::GT),
         ],
+
+        // This works because all keywords will either match identifier or typename
+        keywords: map! {
+            "let"   => TokenKind::Let,
+            "false" => TokenKind::False,
+            "true"  => TokenKind::True,
+            "in"    => TokenKind::In,
+            "fn"    => TokenKind::Fn,
+            "Bool"  => TokenKind::Bool,
+            "Int"   => TokenKind::Int
+        },
 
         comments: vec! [
             Regex::new(r#"^//.*(\n|\z)"#).unwrap(),

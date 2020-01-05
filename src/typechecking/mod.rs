@@ -1,3 +1,19 @@
 mod typing;
+mod typechecker;
+mod env;
+mod constraint;
+mod substitution;
 
 pub use typing::Ty;
+pub use typechecker::Typechecker;
+pub(crate) use env::Env;
+pub(crate) use constraint::Constraint;
+pub(crate) use substitution::{Substitution, solve};
+use std::collections::HashSet;
+
+pub trait Type {
+    fn apply(&mut self, s: &Substitution);
+    fn ftv(&self) -> HashSet<u64>;
+}
+
+
