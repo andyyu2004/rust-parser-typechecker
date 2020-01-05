@@ -1,8 +1,3 @@
-x+4>>=3
-34
-344.
-3442344
-0
 0123
 0123234
 2+4-3
@@ -98,3 +93,8 @@ let f = fn x => x in f(4)
 let f = fn x => x in f
 let x = 5 in x
 let x: Bool = 5 in x
+let x: Bool = false in x
+{}
+{ 5 }
+{ 5; }
+{ 5 }

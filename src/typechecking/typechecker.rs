@@ -71,6 +71,17 @@ impl<'a> Typechecker<'a> {
                 let cs = Constraint::conj(cargs);
                 Ok((expr.ty.clone(), cs))
             }
+            ExprKind::Block { exprs, suppressed } => {
+                if *suppressed {
+                    for expr in exprs { self.infer(expr)?; }
+                    Ok((Ty::Tuple(vec![]), Constraint::Empty))
+                } else {
+                    // If a block is unsuppressed, it must have at least one expression
+                    for expr in &exprs[..exprs.len() - 1] { self.infer(expr)?; }
+                    let last_expr = exprs.last().unwrap();
+                    self.infer(last_expr)
+                }
+            }
             _ => unimplemented!("{}", expr),
         }
     }

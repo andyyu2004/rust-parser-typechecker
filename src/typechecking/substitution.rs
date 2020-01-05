@@ -12,7 +12,7 @@ pub(crate) fn solve(constraint: Constraint) -> Result<Substitution, Error> {
         Constraint::Empty => Ok(HashMap::new()),
         Constraint::And(box c, box mut d) => {
             let s = solve(c)?;
-            d.apply(&s);
+            d.apply(&s); // Apply substitution to constraint before continuing to avoid inconsistencies
             let t = solve(d)?;
             Ok(compose(s, t))
         }
@@ -36,6 +36,7 @@ fn unify(t: Ty, u: Ty) -> Result<Substitution, Error> {
                 .fold(Constraint::Empty, |acc, (t, u)| Constraint::And(box acc, box Constraint::Eq(t, u)));
             solve(cs)
         },
+        (t, u) if t == u => Ok(HashMap::new()),
         (t, u) => Err(Error::new(Token::dummy(), format!("Failed to unify type {} with {}", t, u))),
     }
 }
