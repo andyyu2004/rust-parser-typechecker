@@ -16,6 +16,6 @@ path = "src/bin.rs"
 [dependencies]
 rustyline = "5.0.4"
 regexlexer = { git = "ssh://git@github.com/andyyu2004/rust-regex-lexer.git" }
-variable-gen = { path = "../variable-gen" }
+variable-gen = { git = "ssh://git@gitlab.com/andyyu2004/name-generator.git" }
 regex = "1"
 colour = "0.3.0"
