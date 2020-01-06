@@ -1,19 +1,13 @@
-use regexlexer::Token;
+use crate::parsing::Span;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Error {
-    line: usize,
-    col: usize,
-    msg: String,
+    pub span: Span,
+    pub msg: String,
 }
 
 impl Error {
-    pub fn new(token: Token, msg: String) -> Self {
-        let Token { line, col, .. } = token;
-        Error {
-            msg,
-            line,
-            col,
-        }
+    pub fn new(span: Span, msg: String) -> Self {
+        Error { span, msg }
     }
 }

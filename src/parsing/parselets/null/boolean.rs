@@ -1,15 +1,11 @@
-use crate::parsing::{Parser, Expr, ExprKind};
-use crate::typechecking::Ty;
+use crate::parsing::{Parser, ExprKind};
+use crate::typechecking::{Ty, TyKind};
 use regexlexer::Token;
 use crate::error::Error;
 
-pub(crate) fn parse_bool<'a>(parser: &mut Parser<'a>, token: Token<'a>) -> Result<Expr<'a>, Error> {
+pub(crate) fn parse_bool<'a>(parser: &mut Parser<'a>, token: Token<'a>) -> Result<(ExprKind, Option<Ty>), Error> {
     let b = token.lexeme.parse::<bool>().unwrap();
     let kind = ExprKind::Bool { b };
-    Ok(Expr::new(
-        token,
-        kind,
-        Ty::Bool,
-        parser.gen_id()
-    ))
+    let ty = Ty::new(parser.get_single_span(), TyKind::Bool);
+    Ok((kind, Some(ty)))
 }

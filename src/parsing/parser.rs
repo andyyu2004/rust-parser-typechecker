@@ -1,58 +1,123 @@
-use super::{Expr, Precedence};
+use super::{Expr, Precedence, Span, ExprKind, Binder};
 use regexlexer::{Token, TokenKind};
 use crate::error::Error;
 use super::parselets::*;
-use crate::util::Assert;
-use crate::typechecking::Ty;
+use crate::typechecking::{Ty, TyKind};
 
 pub struct Parser<'a> {
-    tokens: Vec<Token<'a>>,
-    i: usize,
-    node_id: u64,
+    tokens: &'a Vec<Token<'a>>,
+    i: usize, // Current index inside tokens
+    id: u64,  // Counter to generate unique ids
+    span_stack: Vec<usize>,
     backtrack_index: usize,
 }
 
-type NullParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Token<'b>)           -> Result<Expr<'b>, Error>;
-type LeftParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Expr<'b>, Token<'b>) -> Result<Expr<'b>, Error>;
+// Parser functions return a tuple of an exprkind as the fields of the expr can be filled out by the parser
+// It also return a Option of a Type if there is a better option than just generating a new unification variable
+type NullParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Token<'b>)       -> Result<(ExprKind, Option<Ty>), Error>;
+type LeftParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Expr, Token<'b>) -> Result<(ExprKind, Option<Ty>), Error>;
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: Vec<Token<'a>>) -> Self {
-        Parser { tokens, i: 0, node_id: 0, backtrack_index: 0 }
+    pub fn new(tokens: &'a Vec<Token<'a>>) -> Self {
+        Parser { tokens, i: 0, id: 0, backtrack_index: 0, span_stack: Vec::new() }
     }
 
     pub(crate) fn gen_id(&mut self) -> u64 {
-        self.node_id += 1;
-        self.node_id
+        self.id += 1;
+        self.id
     }
 
-    pub(crate) fn gen_type_var(&mut self) -> Ty { Ty::Infer(self.gen_id()) }
+    /// Returns the index into the src file the parser is currently at
+    pub(crate) fn src_index(&self) -> usize { self.curr_or_last().index }
+    pub(crate) fn src_line(&self) -> usize { self.curr_or_last().line }
 
-    pub fn parse(&mut self) -> Result<Expr<'a>, Vec<Error>> {
-        self.parse_expression(Precedence::ZERO)
-            .assert(|_| self.peek().map(|x| x.kind) == Ok(TokenKind::EOF),
-                    || Error::new(self.curr_or_last(), format!("Did not consume all tokens (debug::currently on {:?})", self.peek())))
-            .map_err(|err| vec![err])
+    fn get_span(&mut self) -> Span { Span::new(self.span_stack.pop().unwrap(), self.src_index(), self.src_line()) }
+    fn peek_span(&self) -> Span { Span::new(*self.span_stack.last().unwrap(), self.src_index(), self.src_line()) }
+    pub(crate) fn get_single_span(&self) -> Span { Span::single(self.src_index(), self.src_line()) }
+
+    pub(crate) fn gen_type_var(&mut self) -> Ty {
+        Ty::new(Span::single(self.src_index(), self.src_line()), TyKind::Infer(self.gen_id()))
     }
 
-    fn curr_precedence(&self) -> Precedence {
-        self.peek().map(Precedence::of_left).unwrap_or(Precedence::ZERO)
+    pub fn parse(&mut self) -> Result<Expr, Vec<Error>> {
+        let expr = self.parse_expression(Precedence::ZERO).map_err(|err| vec![err])?;
+        if self.peek().map(|x| x.kind) != Ok(TokenKind::EOF) {
+            return Err(vec![Error::new(expr.span, format!("Did not consume all tokens (debug::currently on {:?})", self.peek()))]);
+        }
+        Ok(expr)
     }
 
-    pub(crate) fn parse_expression(&mut self, precedence: Precedence) -> Result<Expr<'a>, Error> {
+    fn curr_precedence(&self) -> Precedence { self.peek().map(Precedence::of_left).unwrap_or(Precedence::ZERO) }
+
+    pub(crate) fn parse_expression(&mut self, precedence: Precedence) -> Result<Expr, Error> {
+        self.span_stack.push(self.src_index());
         let token = self.next()?;
         let null_parse_fn = Parser::get_null_denotation_rule(token.kind)
-            .ok_or(Error::new(token, format!("Failed to parse null denotation token `{}`", token)))?;
-        let mut expr = null_parse_fn(self, token)?;
+            .ok_or(Error::new(self.peek_span(), format!("Failed to parse null denotation token `{}`", token)))?;
+        let (kind, ty) = null_parse_fn(self, token)?;
+        let mut expr = Expr::new(self.get_span(), kind, ty.unwrap_or(self.gen_type_var()), self.gen_id());
 
         // The left denotation lookup won't fail unlike the null denotation due to the precedence condition on the while loop
         // Bad operators will have zero precedence and hence never enter the loop
         while self.curr_precedence() > precedence {
+            self.span_stack.push(self.src_index());
             let token = self.next()?;
             let left_parse_fn = Parser::get_left_denotation_rule(token.kind);
-            expr = left_parse_fn(self, expr, token)?;
+            let (kind, ty) = left_parse_fn(self, expr, token)?;
+            expr = Expr::new(self.get_span(), kind, ty.unwrap_or(self.gen_type_var()), self.gen_id())
         }
-
         Ok(expr)
+    }
+
+    pub(crate) fn parse_type(&mut self) -> Result<Ty, Error> {
+        self.span_stack.push(self.src_index());
+        if self.matches(TokenKind::Bool) {
+            Ok(Ty::new(self.get_span(), TyKind::Bool))
+        } else if self.matches(TokenKind::Int) {
+            Ok(Ty::new(self.get_span(), TyKind::I64))
+        } else if self.matches(TokenKind::LParen) {
+            self.set_backtrack();
+            let ty = self.parse_type()?;
+            // Parse single types within parens as a tuple
+            Ok(if self.matches(TokenKind::RParen) { ty } else {
+                self.backtrack();
+                let (types, span) = self.parse_tuple(Self::parse_type)?;
+                Ty::new(span, TyKind::Tuple(types))
+            })
+        } else if self.matches(TokenKind::Fn) {
+            self.expect(TokenKind::LParen)?;
+            let (l, span) = self.parse_tuple(Self::parse_type)?;
+            let ttuple = box Ty::new(span, TyKind::Tuple(l));
+            self.expect(TokenKind::RArrow)?;
+            let r = box self.parse_type()?;
+            let kind = TyKind::Arrow(ttuple, r);
+            Ok(Ty::new(self.get_span(), kind))
+        } else if self.matches(TokenKind::Typename) {
+            unimplemented!();
+        } else {
+            unimplemented!();
+        }
+    }
+
+    pub(crate) fn parse_tuple<T>(&mut self, parse_fn: impl Fn(&mut Parser<'a>) -> Result<T, Error>) -> Result<(Vec<T>, Span), Error> {
+        self.span_stack.push(self.src_index());
+        let mut vec = vec![];
+        while !self.matches(TokenKind::RParen) {
+            vec.push(parse_fn(self)?);
+            if !self.matches(TokenKind::Comma) {
+                self.expect(TokenKind::RParen)?;
+                break;
+            }
+        }
+        Ok((vec, self.get_span()))
+    }
+
+    pub(crate) fn parse_binder(&mut self) -> Result<Binder, Error> {
+        self.span_stack.push(self.src_index());
+        let name = self.expect(TokenKind::Identifier)?.lexeme.to_owned();
+        let ty = if self.matches(TokenKind::Colon) { self.parse_type()? }
+        else { self.gen_type_var() };
+        Ok(Binder::new(self.get_span(), name, ty))
     }
 
     /// Returns the relevant null denotation parse function for the tokenkind
@@ -102,7 +167,7 @@ impl<'a> Parser<'a> {
         if self.i < self.tokens.len() {
             Ok(self.tokens[self.i])
         } else {
-            Err(Error::new(*self.tokens.last().unwrap(), "Ran out of tokens".to_owned()))
+            Err(Error::new(Span::single(self.src_index(), self.src_line()), "Ran out of tokens".to_owned()))
         }
     }
 
@@ -113,7 +178,7 @@ impl<'a> Parser<'a> {
             self.i += 1;
             Ok(curr)
         } else {
-            Err(Error::new(curr, format!("Expected `{}` found `{}`", kind, curr.kind)))
+            Err(Error::new(Span::single(self.src_index(), self.src_line()), format!("Expected `{}` found `{}`", kind, curr.kind)))
         }
     }
 
@@ -137,7 +202,7 @@ impl<'a> Parser<'a> {
 The gen only typechecks if the vec! is returned immediately. If bound to a name then returned, it fails. Interesting
 fn parse_prefix_op<'a>(parser: &mut Parser, token: Token) -> Result<Expr<'a>, Error> { unimplemented!() }
 fn parse_identifier<'a>(parser: &mut Parser, token: Token) -> Result<Expr<'a>, Error> { unimplemented!() }
-fn gen<'a>() -> Vec<Box<dyn Fn(&mut Parser, Token) -> Result<Expr<'a>, Error>>> {
+fn gen<'a>() -> Vec<Box<dyn Fn(&mut Parser, Token) -> Result<Expr, Error>>> {
     vec! [
         box parse_prefix_op,
         box parse_identifier,

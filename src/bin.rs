@@ -2,7 +2,8 @@
 use rustyline::{Editor};
 use rustyline::error::{ReadlineError};
 use std::env;
-use parserlib::generate_ast;
+use parserlib::{generate_ast_with_err_handling, generate_ast};
+use parserlib::Formatter;
 
 fn main() {
     let mut rl = Editor::<()>::new();
@@ -14,7 +15,11 @@ fn main() {
 
     if env::args().len() == 2 {
         let contents = std::fs::read_to_string(&env::args().collect::<Vec<String>>()[1]).expect("Failed to read file");
-        std::process::exit(1);
+        let (ty, ast) = generate_ast_with_err_handling(&contents);
+        println!("{:?}", ast);
+        println!("{}", ast);
+        println!("{}", ty);
+
     }
 
     if rl.load_history("history.txt").is_err() {
@@ -26,6 +31,7 @@ fn main() {
         let line = match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
+                rl.save_history("history.txt").unwrap();
                 if line.is_empty() { continue }
                 line
             },
@@ -47,15 +53,13 @@ fn main() {
             Ok((ty, ast)) => {
                 println!("{:?}", ast);
                 println!("{}", ast);
-                println!("{}", ty)
+                println!("{}", ty);
             }
-            Err(err) => {
-                eprintln!("{:?}", err);
-                continue;
+            Err(errors) => {
+                let formatter = Formatter::new(&line);
+                formatter.write(errors);
             }
-        }
-
-        rl.save_history("history.txt").unwrap();
+        };
 
 
     }

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use super::{Ty, Constraint, Type};
+use super::{TyKind, Constraint, Type, Ty};
 use crate::error::Error;
 use crate::map;
 use crate::util::Dummy;
@@ -21,29 +21,29 @@ pub(crate) fn solve(constraint: Constraint) -> Result<Substitution, Error> {
 }
 
 fn unify(t: Ty, u: Ty) -> Result<Substitution, Error> {
-    match (t, u) {
-        (Ty::Infer(i), u) => bind(i, u),
-        (t, Ty::Infer(j)) => bind(j, t),
-        (Ty::Arrow(box l, box r), Ty::Arrow(box t, box u)) => {
+    match (t.kind, u.kind) {
+        (TyKind::Infer(i), y) => bind(i, Ty::new(t.span, y)),
+        (x, TyKind::Infer(j)) => bind(j, Ty::new(u.span, x)),
+        (TyKind::Arrow(box l, box r), TyKind::Arrow(box t, box u)) => {
             solve(Constraint::And(
                 box Constraint::Eq(l, t),
                 box Constraint::Eq(r, u),
             ))
         }
-        (Ty::Tuple(xs), Ty::Tuple(ys)) => {
+        (TyKind::Tuple(xs), TyKind::Tuple(ys)) => {
             let cs = xs.into_iter()
                 .zip(ys)
                 .fold(Constraint::Empty, |acc, (t, u)| Constraint::And(box acc, box Constraint::Eq(t, u)));
             solve(cs)
         },
         (t, u) if t == u => Ok(HashMap::new()),
-        (t, u) => Err(Error::new(Token::dummy(), format!("Failed to unify type {} with {}", t, u))),
+        (x, y) => Err(Error::new(t.span.merge(u.span), format!("Failed to unify type {} with {}", x, y))),
     }
 }
 
 /// Performs occurs check and if it passes, return mapping from inference variable to the type
 fn bind(i: u64, t: Ty) -> Result<Substitution, Error> {
-    if Ty::Infer(i) != t && t.ftv().contains(&i) { Err(Error::new(Token::dummy(), format!("Occurs check failed: {} occurs in {}", i, t))) }
+    if TyKind::Infer(i) != t.kind && t.ftv().contains(&i) { Err(Error::new(t.span, format!("Occurs check failed: {} occurs in {}", i, t))) }
     else { Ok(map! { i => t }) }
 }
 

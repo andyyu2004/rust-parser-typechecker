@@ -4,7 +4,7 @@ mod env;
 mod constraint;
 mod substitution;
 
-pub use typing::Ty;
+pub use typing::{Ty, TyKind};
 pub use typechecker::Typechecker;
 pub(crate) use env::Env;
 pub(crate) use constraint::Constraint;

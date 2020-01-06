@@ -1,8 +1,9 @@
-use crate::parsing::{Parser, Expr, ExprKind, Binder, Precedence};
+use crate::parsing::{Parser, ExprKind, Precedence};
 use regexlexer::{Token, TokenKind};
 use crate::error::Error;
+use crate::typechecking::Ty;
 
-pub(crate) fn parse_block<'a>(parser: &mut Parser<'a>, token: Token<'a>) -> Result<Expr<'a>, Error> {
+pub(crate) fn parse_block(parser: &mut Parser, _token: Token) -> Result<(ExprKind, Option<Ty>), Error> {
     let mut exprs = vec![];
     let mut suppressed = false;
     loop {
@@ -16,5 +17,5 @@ pub(crate) fn parse_block<'a>(parser: &mut Parser<'a>, token: Token<'a>) -> Resu
     // If the supppresed block didn't execute above, we must consume the closing } still
     if !suppressed { parser.expect(TokenKind::RBrace)?; };
     let kind = ExprKind::Block { exprs, suppressed };
-    Ok(Expr::new(token, kind, parser.gen_type_var(), parser.gen_id()))
+    Ok((kind, None))
 }

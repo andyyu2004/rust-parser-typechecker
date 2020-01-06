@@ -9,6 +9,7 @@ impl<'a> Dummy for Token<'a> {
         Token {
             kind: TokenKind::Unknown,
             lexeme: "",
+            index: std::usize::MAX,
             line: std::usize::MAX,
             col: std::usize::MAX,
         }

@@ -1,6 +1,7 @@
 use crate::parsing::{Parser, Expr, Precedence, ExprKind};
 use regexlexer::{Token, TokenKind};
 use crate::error::Error;
+use crate::typechecking::Ty;
 
 /// Returns the precedence accounting for associativity
 /// If an operator is right-associative, recursively parse expression with precedence of one less so it will parse itself
@@ -17,8 +18,8 @@ fn right_associative(token: Token) -> bool {
     }
 }
 
-pub(crate) fn parse_binary<'a>(parser: &mut Parser<'a>, left: Expr<'a>, token: Token<'a>) -> Result<Expr<'a>, Error> {
+pub(crate) fn parse_binary<'a>(parser: &mut Parser<'a>, left: Expr, token: Token<'a>) -> Result<(ExprKind, Option<Ty>), Error> {
     let right = box parser.parse_expression(precedence(token))?;
     let exprkind = ExprKind::Binary { op: token.kind, left: box left, right };
-    Ok(Expr::new(token, exprkind, parser.gen_type_var(), parser.gen_id()))
+    Ok((exprkind, None))
 }

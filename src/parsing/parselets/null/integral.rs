@@ -1,15 +1,11 @@
-use crate::parsing::{Parser, Expr, ExprKind};
-use crate::typechecking::Ty;
+use crate::parsing::{Parser, ExprKind};
+use crate::typechecking::{Ty, TyKind};
 use regexlexer::Token;
 use crate::error::Error;
 
-pub(crate) fn parse_integral<'a>(parser: &mut Parser<'a>, token: Token<'a>) -> Result<Expr<'a>, Error> {
+pub(crate) fn parse_integral<'a>(parser: &mut Parser<'a>, token: Token<'a>) -> Result<(ExprKind, Option<Ty>), Error> {
     let value = token.lexeme.parse::<i64>().unwrap();
     let kind = ExprKind::Integral { value };
-    Ok(Expr::new(
-        token,
-        kind,
-        Ty::I64,
-        parser.gen_id()
-    ))
+    let ty = Ty::new(parser.get_single_span(), TyKind::I64);
+    Ok((kind, Some(ty)))
 }
