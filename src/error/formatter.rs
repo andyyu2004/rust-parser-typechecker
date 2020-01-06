@@ -31,14 +31,14 @@ impl<'a> Formatter<'a> {
     pub fn write_err(&self, error: Error) {
         let Error { span, msg } = &error;
         self.print_relevant_src(&error);
-        let slice = self.slice(span);
+        // let slice = self.slice(span);
         red!("{}", msg)
     }
 
     fn print_relevant_src(&self, error: &Error) {
         let line = error.span.line;
         let (prev, curr, next) = self.surrounding(line);
-        green_ln!("Relevant source code:");
+        green_ln!("Relevant source:");
         if !prev.is_empty() {
             blue!("{}: ", line - 1);
             println!("{}", prev);
