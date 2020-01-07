@@ -3,11 +3,12 @@ use regexlexer::{Token, TokenKind};
 use crate::error::Error;
 use super::parselets::*;
 use crate::typechecking::{Ty, TyKind};
+use crate::util::Counter;
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token<'a>>,
     i: usize, // Current index inside tokens
-    id: u64,  // Counter to generate unique ids
+    name_gen: &'a mut Counter,
     span_stack: Vec<usize>,
     backtrack_index: usize,
 }
@@ -18,13 +19,8 @@ type NullParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Token<'b>)       -> Result
 type LeftParseFn = for<'r, 'b> fn(&'r mut Parser<'b>, Expr, Token<'b>) -> Result<(ExprKind, Option<Ty>), Error>;
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a Vec<Token<'a>>) -> Self {
-        Parser { tokens, i: 0, id: 0, backtrack_index: 0, span_stack: Vec::new() }
-    }
-
-    pub(crate) fn gen_id(&mut self) -> u64 {
-        self.id += 1;
-        self.id
+    pub fn new(tokens: &'a Vec<Token<'a>>, name_gen: &'a mut Counter) -> Self {
+        Parser { tokens, i: 0, backtrack_index: 0, span_stack: Vec::new(), name_gen }
     }
 
     /// Returns the index into the src file the parser is currently at
@@ -34,6 +30,8 @@ impl<'a> Parser<'a> {
     fn get_span(&mut self) -> Span { Span::new(self.span_stack.pop().unwrap(), self.src_index(), self.src_line()) }
     fn peek_span(&self) -> Span { Span::new(*self.span_stack.last().unwrap(), self.src_index(), self.src_line()) }
     pub(crate) fn get_single_span(&self) -> Span { Span::single(self.src_index(), self.src_line()) }
+
+    pub(crate) fn gen_id(&mut self) -> u64 { self.name_gen.next() }
 
     pub(crate) fn gen_type_var(&mut self) -> Ty {
         Ty::new(Span::single(self.src_index(), self.src_line()), TyKind::Infer(self.gen_id()))

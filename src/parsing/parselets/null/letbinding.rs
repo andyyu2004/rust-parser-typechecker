@@ -7,9 +7,7 @@ pub(crate) fn parse_let<'a>(parser: &mut Parser<'a>, _token: Token<'a>) -> Resul
     let binder = parser.parse_binder()?;
     parser.expect(TokenKind::Equal)?;
     let bound = box parser.parse_expression(Precedence::ZERO)?;
-    parser.expect(TokenKind::In)?;
-    let body = box parser.parse_expression(Precedence::ZERO)?;
-    let kind = ExprKind::Let { binder, bound, body };
+    let kind = ExprKind::Let { binder, bound };
     Ok((kind, None))
 }
 

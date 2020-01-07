@@ -1,5 +1,5 @@
 use std::fmt::{self, Display, Formatter, Debug};
-use super::{Type, Substitution};
+use super::{Type, Substitution, TyScheme, Env};
 use std::collections::HashSet;
 use crate::set;
 use crate::parsing::Span;
@@ -18,6 +18,12 @@ impl Ty {
     pub fn new(span: Span, kind: TyKind) -> Self {
         Self { span, kind }
     }
+
+    pub(crate) fn generalize(self, env: &Env<&str, TyScheme>) -> TyScheme {
+        let forall = &self.ftv() - &env.ftv();
+        TyScheme::new(self, forall)
+    }
+
 }
 
 impl Type for Ty {
@@ -39,6 +45,10 @@ pub enum TyKind {
     Arrow(Box<Ty>, Box<Ty>),
 }
 
+impl TyKind {
+    pub fn unit() -> Self { Self::Tuple(Vec::new()) }
+}
+
 impl Type for TyKind {
     fn apply(&mut self, s: &Substitution) {
         match self {
@@ -57,12 +67,15 @@ impl Type for TyKind {
             Self::Tuple(xs) => xs.iter()
                 .map(|x| x.ftv())
                 .fold(HashSet::new(), |acc, x| &acc | &x),
-            Self::Arrow(l, r) => &l.ftv() & &r.ftv(),
+            Self::Arrow(l, r) => &l.ftv() | &r.ftv(),
             Self::Bool | Self::F64 | Self::I64 => HashSet::new(),
         }
     }
 }
 
+/// Convenience method for testing
+#[cfg(test)]
+impl TyKind { fn to_ty(self) -> Ty { Ty::new(Span::single(0, 0), self) } }
 
 impl Display for TyKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -79,5 +92,22 @@ impl Display for TyKind {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_ftv() {
+        let a = TyKind::Infer(0).to_ty();
+        let b = TyKind::Tuple(vec![TyKind::F64.to_ty(), TyKind::Infer(2).to_ty()]).to_ty();
+        let f = TyKind::Arrow(box a, box b);
+        assert_eq!(f.ftv(), set! { 0, 2 })
+    }
+}
+
+
+
+
 
 

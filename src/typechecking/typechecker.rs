@@ -1,14 +1,16 @@
 use crate::parsing::{Expr, ExprKind, Binder, Span};
 use crate::error::Error;
-use super::{TyKind, Ty, Env, Constraint, Type, solve};
+use super::{TyKind, Ty, Env, Constraint, Type, TyScheme, solve};
+use crate::util::Counter;
 
 pub struct Typechecker<'a> {
-    env: Env<&'a str, Ty>
+    env: Env<&'a str, TyScheme>,
+    name_gen: &'a mut Counter,
 }
 
 impl<'a> Typechecker<'a> {
-    pub fn new() -> Self {
-        Self { env: Env::new() }
+    pub fn new(name_gen: &'a mut Counter) -> Self {
+        Self { env: Env::new(), name_gen }
     }
 
     pub fn typecheck(&mut self, expr: &'a Expr) -> Result<Ty, Vec<Error>> {
@@ -22,34 +24,29 @@ impl<'a> Typechecker<'a> {
     pub fn infer(&mut self, expr: &'a Expr) -> Result<(Ty, Constraint), Error> {
         match &expr.kind {
             ExprKind::Bool { .. } | ExprKind::Integral { .. } => Ok(self.typecheck_literal(expr)),
-            ExprKind::Id { name } => self.env.lookup(&name.as_str())
-                .ok_or(Error::new(expr.span, format!("Unbound variable `{}`", name)))
-                .map(|ty_ref| (ty_ref.clone(), Constraint::Empty)),
-            ExprKind::Let { binder, bound, body } => {
-                let Binder { name, ty, .. } = binder;
+            ExprKind::Id { name } => {
+                let scheme = self.env.lookup(&name.as_str())
+                    .ok_or(Error::new(expr.span, format!("Unbound variable `{}`", name)))?;
+                Ok((scheme.instantiate(self.name_gen), Constraint::Empty))
+            }
+            ExprKind::Let { binder, bound } => {
                 self.env.push();
-                self.env.define(name, ty.clone());
-
                 let (tbound, cbound) = self.infer(bound)?;
-                let c_tbound_eq_binder_annotation = Constraint::Eq(tbound.clone(), ty.clone());
-
-                let (tbody, cbody) = self.infer(body)?;
-                let c_binder_eq_bound = Constraint::Eq(ty.clone(), tbound);
-                let c_body_eq_let = Constraint::Eq(tbody.clone(), expr.ty.clone());
-                let cs = Constraint::conj(vec![
-                    c_body_eq_let,
-                    c_binder_eq_bound,
-                    cbody,
-                    cbound,
-                    c_tbound_eq_binder_annotation
-                ]);
-                Ok((tbody, cs))
+                let c_tbound_eq_binder_annotation = box Constraint::Eq(tbound.clone(), binder.ty.clone());
+                let c = Constraint::And(box cbound, c_tbound_eq_binder_annotation);
+                let s = solve(c.clone())?;
+                let mut principle_ty = tbound.clone();
+                principle_ty.apply(&s);
+                let generalized = principle_ty.generalize(&self.env);
+                self.env.define(&binder.name, generalized);
+                let tret = Ty::new(expr.span, TyKind::unit()); // Let expressions always return unit;
+                Ok((tret, c))
             }
             ExprKind::Lambda { params, ret, body } => {
                 self.env.push();
                 let tparams = Ty::new(expr.span, TyKind::Tuple(params.iter().map(|binder| {
                     let Binder { name, ty, .. } = binder;
-                    self.env.define(name, ty.clone());
+                    self.env.define(name, TyScheme::from(ty));
                     binder.ty.clone()
                 }).collect::<Vec<_>>()));
 
@@ -81,6 +78,7 @@ impl<'a> Typechecker<'a> {
                 self.env.restore();
                 Ok((block_type, Constraint::conj(constraints)))
             }
+            ExprKind::Grouping { expr } => self.infer(expr),
             _ => unimplemented!("{}", expr),
         }
     }

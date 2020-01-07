@@ -14,6 +14,7 @@ mod typechecking;
 use regexlexer::{Lexer, LexSyntax};
 use lexing::gen_syntax;
 use typechecking::Typechecker;
+use util::Counter;
 
 pub use error::{Error, Formatter};
 pub use parsing::{Parser, Expr, ExprKind};
@@ -34,9 +35,11 @@ pub fn generate_ast_with_syntax<'a, 'b>(src: &'a str, syntax: &'b LexSyntax) -> 
             std::process::exit(1);
         }
     };
-    let mut parser = Parser::new(&tokens);
-    let mut typechecker = Typechecker::new();
+
+    let mut gen = Counter::new();
+    let mut parser = Parser::new(&tokens, &mut gen);
     let expr = parser.parse()?;
+    let mut typechecker = Typechecker::new(&mut gen);
     let ty = typechecker.typecheck(&expr)?;
 
     Ok((ty, expr))
@@ -53,9 +56,9 @@ pub fn generate_ast_with_err_handling(src: &str) -> (Ty, Expr) {
         }
     };
 
-    println!("{:?}", tokens);
-    let mut parser = Parser::new(&tokens);
-    let mut typechecker = Typechecker::new();
+    // println!("{:?}", tokens);
+    let mut gen = Counter::new();
+    let mut parser = Parser::new(&tokens, &mut gen);
     let formatter = Formatter::new(src);
 
     let ast = match parser.parse() {
@@ -66,6 +69,7 @@ pub fn generate_ast_with_err_handling(src: &str) -> (Ty, Expr) {
         }
     };
 
+    let mut typechecker = Typechecker::new(&mut gen);
     let ty = match typechecker.typecheck(&ast) {
         Ok(ast) => ast,
         Err(errors) => {
@@ -77,6 +81,21 @@ pub fn generate_ast_with_err_handling(src: &str) -> (Ty, Expr) {
     (ty, ast)
 }
 
+
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_counter() {
+        let mut gen = Counter::new();
+        assert_eq!(1, gen.next());
+        assert_eq!(2, gen.next());
+        assert_eq!(3, gen.next());
+        assert_eq!(4, gen.next());
+    }
+}
 
 
 

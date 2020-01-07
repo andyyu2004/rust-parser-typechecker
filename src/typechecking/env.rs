@@ -1,11 +1,20 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::fmt::Debug;
+use super::{Type, TyScheme, Substitution};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Env<K, V> where K : Hash + Eq + Debug, V : Debug + PartialEq {
     contexts: Vec<Ctx<K, V>>,
     saved: usize,
+}
+
+impl<K> Type for Env<K, TyScheme> where K : Hash + Eq + Debug {
+    fn ftv(&self) -> HashSet<u64> {
+        self.contexts.iter().map(|t| t.ftv()).fold(HashSet::new(), |acc, x| &acc | &x)
+    }
+
+    fn apply(&mut self, _s: &Substitution) { unimplemented!() }
 }
 
 impl<'a, K, V> Env<K, V> where K : Hash + Eq + Debug, V : Debug + PartialEq {
@@ -14,26 +23,18 @@ impl<'a, K, V> Env<K, V> where K : Hash + Eq + Debug, V : Debug + PartialEq {
         Self { contexts: vec![Ctx::new()], saved: 1 }
     }
 
-    pub fn define(&mut self, k: K, v: V) {
-        self.contexts.last_mut().unwrap().insert(k, v);
-    }
+    pub fn define(&mut self, k: K, v: V) { self.contexts.last_mut().unwrap().insert(k, v) }
 
     /// Saves a scope as a restore point
     pub fn save(&mut self) { self.saved = self.contexts.len() }
 
     /// Restore pops every scope after the saved one
     /// Saved scope is NOT removed
-    pub fn restore(&mut self) {
-        self.contexts.drain(self.saved..);
-    }
+    pub fn restore(&mut self) { self.contexts.drain(self.saved..); }
 
-    pub fn push(&mut self) {
-        self.contexts.push(Ctx::new())
-    }
+    pub fn push(&mut self) { self.contexts.push(Ctx::new()) }
 
-    pub fn pop(&mut self) {
-        self.contexts.pop();
-    }
+    pub fn pop(&mut self) { self.contexts.pop(); }
 
     pub fn lookup(&self, k: &K) -> Option<&V> {
         for ctx in self.contexts.iter().rev() {
@@ -47,6 +48,16 @@ impl<'a, K, V> Env<K, V> where K : Hash + Eq + Debug, V : Debug + PartialEq {
 #[derive(Debug, PartialEq)]
 pub(crate) struct Ctx<K, V> where K : Hash + Eq + Debug, V : Debug + PartialEq {
     ctx: HashMap<K, V>
+}
+
+impl<K> Type for Ctx<K, TyScheme> where K : Hash + Eq + Debug {
+    fn ftv(&self) -> HashSet<u64> {
+        self.ctx.values().map(|t| t.ftv()).fold(HashSet::new(), |acc, x| &acc | &x)
+    }
+
+    fn apply(&mut self, s: &Substitution) {
+        self.ctx.values_mut().for_each(|t| t.apply(s))
+    }
 }
 
 impl<'a, K, V> Ctx<K, V> where K : Hash + Eq + Debug, V : Debug + PartialEq {

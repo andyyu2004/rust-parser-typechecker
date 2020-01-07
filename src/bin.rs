@@ -19,7 +19,7 @@ fn main() {
         println!("{:?}", ast);
         println!("{}", ast);
         println!("{}", ty);
-
+        std::process::exit(0);
     }
 
     if rl.load_history("history.txt").is_err() {

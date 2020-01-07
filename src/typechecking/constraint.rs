@@ -2,6 +2,7 @@ use super::{Ty, Type, Substitution};
 use std::fmt::{self, Formatter, Display};
 use std::collections::HashSet;
 
+#[derive(Clone)]
 pub enum Constraint {
     Empty,
     Eq(Ty, Ty),
@@ -14,8 +15,8 @@ impl Type for Constraint {
     fn ftv(&self) -> HashSet<u64> {
         match self {
             Empty     => HashSet::new(),
-            Eq(t, u)  => &t.ftv() & &u.ftv(),
-            And(c, d) => &c.ftv() & &d.ftv(),
+            Eq(t, u)  => &t.ftv() | &u.ftv(),
+            And(c, d) => &c.ftv() | &d.ftv(),
         }
     }
 

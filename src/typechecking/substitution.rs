@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use super::{TyKind, Constraint, Type, Ty};
 use crate::error::Error;
 use crate::map;
-use crate::util::Dummy;
-use regexlexer::Token;
 
 pub type Substitution = HashMap<u64, Ty>;
 
@@ -62,6 +60,11 @@ mod test {
 
     use crate::map;
     use super::*;
+    use crate::parsing::Span;
+
+    fn to_ty(kind: TyKind) -> Ty {
+        Ty::new(Span::single(0, 0), kind)
+    }
 
     #[test]
     fn test_right_bias_of_extend() {
@@ -74,40 +77,40 @@ mod test {
     #[test]
     fn left_bias_of_compose() {
         let a = map! {
-            5 => Ty::Bool
+            5 => to_ty(TyKind::Bool)
         };
         let b = map! {
-            5 => Ty::I64
+            5 => to_ty(TyKind::I64)
         };
         assert_eq!(map! {
-           5 => Ty::Bool
+           5 => to_ty(TyKind::Bool)
         }, compose(a, b));
     }
 
     #[test]
     fn combine() {
-        let a = map! { 0 => Ty::Bool };
-        let b = map! { 1 => Ty::I64 };
+        let a = map! { 0 => to_ty(TyKind::Bool) };
+        let b = map! { 1 => to_ty(TyKind::I64) };
         assert_eq!(map! {
-            0 => Ty::Bool,
-            1 => Ty::I64
+            0 => to_ty(TyKind::Bool),
+            1 => to_ty(TyKind::I64)
         }, compose(a, b));
     }
 
     #[test]
     fn test_compose() {
         let a = map! {
-            1 => Ty::Infer(12),
-            5 => Ty::I64
+            1 => to_ty(TyKind::Infer(12)),
+            5 => to_ty(TyKind::I64)
         };
         let b = map! {
-            12 => Ty::Bool,
-            5  => Ty::F64
+            12 => to_ty(TyKind::Bool),
+            5  => to_ty(TyKind::F64)
         };
         assert_eq!(map! {
-            1  => Ty::Bool,
-            5  => Ty::I64,
-            12 => Ty::Bool
+            1  => to_ty(TyKind::Bool),
+            5  => to_ty(TyKind::I64),
+            12 => to_ty(TyKind::Bool)
         }, compose(a, b));
     }
 }
