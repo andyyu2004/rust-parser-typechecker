@@ -44,6 +44,8 @@ impl Display for Binder {
     }
 }
 
+impl Debug for Binder { fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "{}", self) } }
+
 #[derive(Clone, PartialEq)]
 pub enum ExprKind {
     Unary { op: TokenKind, expr: Box<Expr> },
@@ -57,6 +59,7 @@ pub enum ExprKind {
     Block { exprs: Vec<Expr>, suppressed: bool },
     Lambda { params: Vec<Binder>, ret: Ty, body: Box<Expr> },
     App { f: Box<Expr>, args: Vec<Expr> },
+    Tuple { elems: Vec<Expr> },
 }
 
 pub fn fmt_vec<T>(xs: &Vec<T>, sep: &str) -> String where T : Display {
@@ -70,17 +73,18 @@ pub fn fmt_vec_debug<T>(xs: &Vec<T>, sep: &str) -> String where T : Debug {
 impl Display for ExprKind {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         match self {
-            ExprKind::Unary { op, expr }           => write!(fmt, "{}{}", op, expr),
-            ExprKind::Integral { value }           => write!(fmt, "{}", value),
-            ExprKind::Id { name }                  => write!(fmt, "{}", name),
-            ExprKind::Binary { op, left, right }   => write!(fmt, "{} {} {}", left, op, right),
-            ExprKind::Grouping { expr }            => write!(fmt, "({})", expr),
-            ExprKind::Bool { b }                   => write!(fmt, "{}", b),
-            ExprKind::Str { string }               => write!(fmt, "{}", string),
-            ExprKind::Let { binder, bound }        => write!(fmt, "let {} = {}", binder, bound),
-            ExprKind::Block { exprs, suppressed }  => write!(fmt, "{{ {}{} }}", fmt_vec(exprs, "; "), if *suppressed { ";" } else {""}),
-            ExprKind::Lambda { params, ret, body } => write!(fmt, "fn ({}) -> {} => {}", fmt_vec(params, ", "), ret, body),
-            ExprKind::App { f, args }              => write!(fmt, "{}({})", f, fmt_vec(args, ", ")),
+            Self::Unary { op, expr }           => write!(fmt, "{}{}", op, expr),
+            Self::Integral { value }           => write!(fmt, "{}", value),
+            Self::Id { name }                  => write!(fmt, "{}", name),
+            Self::Binary { op, left, right }   => write!(fmt, "{} {} {}", left, op, right),
+            Self::Grouping { expr }            => write!(fmt, "({})", expr),
+            Self::Bool { b }                   => write!(fmt, "{}", b),
+            Self::Str { string }               => write!(fmt, "{}", string),
+            Self::Let { binder, bound }        => write!(fmt, "let {} = {}", binder, bound),
+            Self::Block { exprs, suppressed }  => write!(fmt, "{{ {}{} }}", fmt_vec(exprs, "; "), if *suppressed { ";" } else {""}),
+            Self::Lambda { params, ret, body } => write!(fmt, "fn ({}) -> {} => {}", fmt_vec(params, ", "), ret, body),
+            Self::App { f, args }              => write!(fmt, "{}({})", f, fmt_vec(args, ", ")),
+            Self::Tuple { elems }              => write!(fmt, "({})", fmt_vec(elems, ", ")),
         }
     }
 }
@@ -88,17 +92,18 @@ impl Display for ExprKind {
 impl Debug for ExprKind {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         match self {
-            ExprKind::Unary { op, expr }           => write!(fmt, "({}{:?})", op, expr),
-            ExprKind::Integral { value }           => write!(fmt, "{}", value),
-            ExprKind::Id { name }                  => write!(fmt, "{}", name),
-            ExprKind::Binary { op, left, right }   => write!(fmt, "({} {:?} {:?})", op, left, right),
-            ExprKind::Grouping { expr }            => write!(fmt, "{:?}", expr),
-            ExprKind::Bool { b }                   => write!(fmt, "{}", b),
-            ExprKind::Str { string }               => write!(fmt, "{}", string),
-            ExprKind::Let { binder, bound }        => write!(fmt, "(let [{} = {:?}])", binder, bound),
-            ExprKind::Block { exprs, suppressed }  => write!(fmt, "{{ {}{} }}", fmt_vec_debug(exprs, "; "), if *suppressed { ";" } else {""}),
-            ExprKind::Lambda { params, ret, body } => write!(fmt, "(lambda ({}) -> {} => {:?})", fmt_vec(params, ", "), ret, body),
-            ExprKind::App { f, args }              => write!(fmt, "({} {})", f, fmt_vec_debug(args, " ")),
+            Self::Unary { op, expr }           => write!(fmt, "({}{:?})", op, expr),
+            Self::Integral { value }           => write!(fmt, "{}", value),
+            Self::Id { name }                  => write!(fmt, "{}", name),
+            Self::Binary { op, left, right }   => write!(fmt, "({} {:?} {:?})", op, left, right),
+            Self::Grouping { expr }            => write!(fmt, "{:?}", expr),
+            Self::Bool { b }                   => write!(fmt, "{}", b),
+            Self::Str { string }               => write!(fmt, "{}", string),
+            Self::Let { binder, bound }        => write!(fmt, "(let [{} = {:?}])", binder, bound),
+            Self::Block { exprs, suppressed }  => write!(fmt, "{{ {}{} }}", fmt_vec_debug(exprs, "; "), if *suppressed { ";" } else {""}),
+            Self::Lambda { params, ret, body } => write!(fmt, "(lambda ({}) -> {} => {:?})", fmt_vec_debug(params, ", "), ret, body),
+            Self::App { f, args }              => write!(fmt, "({} {})", f, fmt_vec_debug(args, " ")),
+            Self::Tuple { elems }              => write!(fmt, "({})", fmt_vec_debug(elems, ", ")),
         }
     }
 

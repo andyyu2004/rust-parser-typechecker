@@ -28,6 +28,12 @@ impl Ty {
         Self { span: Span::single(0, 0), kind: TyKind::Erased }
     }
 
+    /// wraps Ty into singleton tuple
+    pub(crate) fn singleton(self) -> Self {
+        let span = self.span;
+        Self::new(span, TyKind::Tuple(vec![self]))
+    }
+
     pub(crate) fn take(&mut self) -> Self {
         std::mem::replace(self, Ty::erased())
     }
@@ -50,6 +56,7 @@ pub enum TyKind {
     I64,
     F64,
     Infer(u64), // Unification type variable
+    TyVar(String),
     Tuple(Vec<Ty>),
     Arrow(Box<Ty>, Box<Ty>),
 }
@@ -64,8 +71,8 @@ impl Type for TyKind {
             Self::Infer(i) => if let Some(t) = s.get(i) { *self = t.kind.clone() }
             Self::Tuple(xs) => xs.iter_mut().for_each(|t| t.apply(s)),
             Self::Arrow(box l, box r) => { l.apply(s); r.apply(s); }
-            Self::Bool | Self::F64 | Self::I64 => {},
-            Self::Erased => panic!("applying to erased type"),
+            Self::Bool | Self::F64 | Self::I64 | Self::Erased => {},
+            Self::TyVar(_n) => unimplemented!(),
         }
     }
 
@@ -78,32 +85,34 @@ impl Type for TyKind {
                 .map(|x| x.ftv())
                 .fold(HashSet::new(), |acc, x| &acc | &x),
             Self::Arrow(l, r) => &l.ftv() | &r.ftv(),
-            Self::Bool | Self::F64 | Self::I64 => HashSet::new(),
-            Self::Erased => panic!("ftv of erased type"),
+            Self::Bool | Self::F64 | Self::I64 | Self::Erased => HashSet::new(),
+            Self::TyVar(_n) => unimplemented!(),
         }
     }
 }
-
-/// Convenience method for testing
-#[cfg(test)]
-impl TyKind { fn to_ty(self) -> Ty { Ty::new(Span::single(0, 0), self) } }
 
 impl Display for TyKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::Infer(i)     => write!(f, "{}", i),
+            Self::Infer(i)     => write!(f, "τ{}", i),
             Self::I64          => write!(f, "i64"),
             Self::F64          => write!(f, "f64"),
             Self::Bool         => write!(f, "bool"),
             Self::Tuple(xs)    => write!(f, "({})", xs.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", ")),
+            Self::TyVar(name)     => write!(f, "{}", name),
+            Self::Erased       => write!(f, "τ"),
             Self::Arrow(box l, r)  => match l.kind {
                 Self::Arrow(..) => write!(f, "({}) -> {}", l, r),
                 _               => write!(f, "{} -> {}", l, r),
             },
-            Self::Erased => write!(f, "τ"),
         }
     }
 }
+
+
+/// Convenience method for testing
+#[cfg(test)]
+impl TyKind { pub fn to_ty(self) -> Ty { Ty::new(Span::single(0, 0), self) } }
 
 #[cfg(test)]
 mod test {
