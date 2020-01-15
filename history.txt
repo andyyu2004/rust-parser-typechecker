@@ -1,5 +1,3 @@
-fn x: fn (Int, fn (Int) -> Bool,) -> Int => 5
-fn x: fn (Int, fn (Int) -> Bool, ) -> Int => 5
 fn x: fn (Int, fn (Int) -> Bool) -> Int => 5
 fn x: fn (Int, fn (Int) -> Bool) => 5
 fn x: (Int, fn (Int) -> Bool) => 5
@@ -98,3 +96,5 @@ ls
 (fn x => x)
 (fn x => x)(4)
 (fn x => x)
+{ let f  = fn x => x; f(4); f(false); f(4) }
+{ let f  = fn x => x; f(4); f(false); f(4); f(false) }
