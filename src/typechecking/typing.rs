@@ -24,6 +24,14 @@ impl Ty {
         TyScheme::new(self, forall)
     }
 
+    pub(crate) fn erased() -> Self {
+        Self { span: Span::single(0, 0), kind: TyKind::Erased }
+    }
+
+    pub(crate) fn take(&mut self) -> Self {
+        std::mem::replace(self, Ty::erased())
+    }
+
 }
 
 impl Type for Ty {
@@ -37,6 +45,7 @@ impl Display for Ty {
 
 #[derive(Clone, PartialEq, Debug, Eq)]
 pub enum TyKind {
+    Erased,
     Bool,
     I64,
     F64,
@@ -56,6 +65,7 @@ impl Type for TyKind {
             Self::Tuple(xs) => xs.iter_mut().for_each(|t| t.apply(s)),
             Self::Arrow(box l, box r) => { l.apply(s); r.apply(s); }
             Self::Bool | Self::F64 | Self::I64 => {},
+            Self::Erased => panic!("applying to erased type"),
         }
     }
 
@@ -69,6 +79,7 @@ impl Type for TyKind {
                 .fold(HashSet::new(), |acc, x| &acc | &x),
             Self::Arrow(l, r) => &l.ftv() | &r.ftv(),
             Self::Bool | Self::F64 | Self::I64 => HashSet::new(),
+            Self::Erased => panic!("ftv of erased type"),
         }
     }
 }
@@ -88,7 +99,8 @@ impl Display for TyKind {
             Self::Arrow(box l, r)  => match l.kind {
                 Self::Arrow(..) => write!(f, "({}) -> {}", l, r),
                 _               => write!(f, "{} -> {}", l, r),
-            }
+            },
+            Self::Erased => write!(f, "τ"),
         }
     }
 }

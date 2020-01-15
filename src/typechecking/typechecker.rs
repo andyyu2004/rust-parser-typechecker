@@ -1,7 +1,8 @@
 use crate::parsing::{Expr, ExprKind, Binder, Span};
 use crate::error::Error;
 use super::{TyKind, Ty, Env, Constraint, Type, TyScheme, solve};
-use crate::util::Counter;
+use crate::util::{self, Counter};
+use std::mem;
 
 pub struct Typechecker<'a> {
     env: Env<&'a str, TyScheme>,
@@ -13,7 +14,7 @@ impl<'a> Typechecker<'a> {
         Self { env: Env::new(), name_gen }
     }
 
-    pub fn typecheck(&mut self, expr: &'a Expr) -> Result<Ty, Vec<Error>> {
+    pub fn typecheck(&mut self, expr: &'a mut Expr) -> Result<Ty, Vec<Error>> {
         let (mut t, c) = self.infer(expr).map_err(|e| vec![e])?;
         println!("c: {}", c);
         let substitution = solve(c).map_err(|err| vec![err])?;
@@ -21,9 +22,8 @@ impl<'a> Typechecker<'a> {
         Ok(t)
     }
 
-    pub fn infer(&mut self, expr: &'a Expr) -> Result<(Ty, Constraint), Error> {
-        match &expr.kind {
-            ExprKind::Bool { .. } | ExprKind::Integral { .. } => Ok(self.typecheck_literal(expr)),
+    pub fn infer(&mut self, expr: &'a mut Expr) -> Result<(Ty, Constraint), Error> {
+        match &mut expr.kind {
             ExprKind::Id { name } => {
                 let scheme = self.env.lookup(&name.as_str())
                     .ok_or(Error::new(expr.span, format!("Unbound variable `{}`", name)))?;
@@ -44,27 +44,27 @@ impl<'a> Typechecker<'a> {
             }
             ExprKind::Lambda { params, ret, body } => {
                 self.env.push();
-                let tparams = Ty::new(expr.span, TyKind::Tuple(params.iter().map(|binder| {
-                    let Binder { name, ty, .. } = binder;
-                    self.env.define(name, TyScheme::from(ty));
-                    binder.ty.clone()
+                let tparams = Ty::new(expr.span, TyKind::Tuple(params.iter_mut().map(|binder| {
+                    self.env.define(&binder.name, TyScheme::from(binder.ty.clone()));
+                    binder.ty.take()
                 }).collect::<Vec<_>>()));
 
                 let (tbody, cbody) = self.infer(body)?;
                 let tlambda = Ty::new(expr.span, TyKind::Arrow(box tparams, box tbody.clone()));
-                let clambda = Constraint::Eq(tlambda.clone(), expr.ty.clone());
-                let c_ret_eq_body = Constraint::Eq(tbody, ret.clone());
+                let clambda = Constraint::Eq(tlambda.clone(), expr.ty.take());
+                let c_ret_eq_body = Constraint::Eq(tbody, ret.take());
                 let cs = Constraint::conj(vec![clambda, c_ret_eq_body, cbody]);
 
                 self.env.pop();
                 Ok((tlambda, cs))
             }
             ExprKind::App { f, args } => {
+                let fspan = f.span; // for borrow checker reasons
                 let (tf, cf) = self.infer(f)?;
-                let xs = args.iter().map(|e| self.infer(e)).collect::<Result<Vec<_>, _>>()?;
-                let (vargs, mut cargs) = crate::util::split(xs);
+                let xs = args.iter_mut().map(|e| self.infer(e)).collect::<Result<Vec<_>, _>>()?;
+                let (vargs, mut cargs) = util::split(xs);
                 let targs = box Ty::new(expr.span, TyKind::Tuple(vargs));
-                let capp = Constraint::Eq(tf, Ty::new(f.span, TyKind::Arrow(targs, box expr.ty.clone())));
+                let capp = Constraint::Eq(tf, Ty::new(fspan, TyKind::Arrow(targs, box expr.ty.take())));
                 cargs.extend(vec![cf, capp]);
                 let cs = Constraint::conj(cargs);
                 Ok((expr.ty.clone(), cs))
@@ -72,29 +72,29 @@ impl<'a> Typechecker<'a> {
             ExprKind::Block { exprs, suppressed } => {
                 self.env.save();
                 self.env.push();
-                let xs = exprs.iter().map(|e| self.infer(e)).collect::<Result<Vec<_>,_>>()?;
-                let block_type = if *suppressed { Ty::new(expr.span, TyKind::Tuple(vec![])) } else { xs.last().unwrap().0.clone() };
-                let constraints = xs.into_iter().map(|(_, c)| c).collect::<Vec<_>>();
+                let xs = exprs.iter_mut().map(|e| self.infer(e)).collect::<Result<Vec<_>,_>>()?;
+                let (mut types, constraints) = util::split(xs);
+                let block_type = if *suppressed { Ty::new(expr.span, TyKind::unit()) } else { types.remove(types.len() - 1) };
                 self.env.restore();
                 Ok((block_type, Constraint::conj(constraints)))
             }
             ExprKind::Grouping { expr } => self.infer(expr),
-            _ => unimplemented!("{}", expr),
+            k@ExprKind::Bool { .. } | k@ExprKind::Integral { .. } => Ok(Self::typecheck_literal(k, &expr.ty, expr.span)),
+            expr => unimplemented!("{}", expr),
         }
     }
 
-    fn typecheck_literal(&self, expr: &'a Expr) -> (Ty, Constraint) {
-        debug_assert_eq!(Self::typeof_literal(expr), expr.ty);
-        (expr.ty.clone(), Constraint::Empty)
+    fn typecheck_literal(exprkind: &ExprKind, ty: &Ty, span: Span) -> (Ty, Constraint) {
+        debug_assert_eq!(ty.kind, Self::type_of_literal_expr(exprkind));
+        (Ty::new(span, Self::type_of_literal_expr(exprkind)), Constraint::Empty)
     }
 
-    fn typeof_literal(expr: &Expr) -> Ty {
-        let kind = match expr.kind {
-            ExprKind::Bool { .. }     => TyKind::Bool,
+    fn type_of_literal_expr(exprkind: &ExprKind) -> TyKind {
+        match exprkind {
             ExprKind::Integral { .. } => TyKind::I64,
-            _ => panic!("Not a literal")
-        };
-        Ty::new(expr.span, kind)
+            ExprKind::Bool { .. }     => TyKind::Bool,
+            _ => panic!("{} is not a literal", exprkind)
+        }
     }
 }
 

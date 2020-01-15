@@ -38,7 +38,7 @@ impl<'a> Formatter<'a> {
     fn print_relevant_src(&self, error: &Error) {
         let line = error.span.line;
         let (prev, curr, next) = self.surrounding(line);
-        green_ln!("Relevant source:");
+        green_ln!("Relevant source code:");
         if !prev.is_empty() {
             blue!("{}: ", line - 1);
             println!("{}", prev);

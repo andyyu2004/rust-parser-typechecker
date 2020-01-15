@@ -38,9 +38,9 @@ pub fn generate_ast_with_syntax<'a, 'b>(src: &'a str, syntax: &'b LexSyntax) -> 
 
     let mut gen = Counter::new();
     let mut parser = Parser::new(&tokens, &mut gen);
-    let expr = parser.parse()?;
+    let mut expr = parser.parse()?;
     let mut typechecker = Typechecker::new(&mut gen);
-    let ty = typechecker.typecheck(&expr)?;
+    let ty = typechecker.typecheck(&mut expr)?;
 
     Ok((ty, expr))
 }
@@ -61,7 +61,7 @@ pub fn generate_ast_with_err_handling(src: &str) -> (Ty, Expr) {
     let mut parser = Parser::new(&tokens, &mut gen);
     let formatter = Formatter::new(src);
 
-    let ast = match parser.parse() {
+    let mut ast = match parser.parse() {
         Ok(ast) => ast,
         Err(errors) => {
             formatter.write(errors);
@@ -70,7 +70,7 @@ pub fn generate_ast_with_err_handling(src: &str) -> (Ty, Expr) {
     };
 
     let mut typechecker = Typechecker::new(&mut gen);
-    let ty = match typechecker.typecheck(&ast) {
+    let ty = match typechecker.typecheck(&mut ast) {
         Ok(ast) => ast,
         Err(errors) => {
             formatter.write(errors);
